@@ -1,0 +1,4 @@
+celery[redis]
+jinja2
+starlette
+uvicorn

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      html, body {
+      height: 100%;
+      margin: 0;
+      }
+      .centered {
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      }
+    </style>
+  </head>
+  <body class="centered">
+    <div>
+      <h1>SSE Demo</h1>
+      <h2>Message</h2>
+      <p id="message">Waiting for server-sent message...</p>
+    </div>
+  </body>
+  <script>
+    // Get result from server sent events.
+    async function waitForResult() {
+      console.log("Waiting for task result...");
+
+      // Collect the task_id from the session cookie.
+      const taskId = await waitForTaskIdCookie();
+
+      // Connect to the task_status streaming endpoing.
+      const eventSource = new EventSource(`/task_status/${taskId}/`);
+
+      // This will get triggered when the server sends an update on
+      // the task status
+      eventSource.onmessage = function(event) {
+        console.log("Task result:", event.data);
+
+        // Parser the JSONified event message.
+        const data = JSON.parse(event.data);
+
+        // Log the message to the console.
+        const message = `Server sent: ${data.result}`;
+
+        if(data.state === "SUCCESS") {
+          document.getElementById("message").innerHTML = message;
+          eventSource.close(); // Close the connection from the client side.
+
+        } else if(data.state === "UNFINISHED") {
+          document.getElementById("message").innerHTML = message;
+          eventSource.close(); // Close the connection from the client side.
+        }
+      };
+
+      eventSource.onerror = function(event) {
+        console.log("Error:", event);
+      };
+      eventSource.onopen = function(event) {
+        console.log("Connection opened:", event);
+      };
+      eventSource.onclose = function(event) {
+        console.log("Connection closed:", event);
+      };
+    }
+    // Wait for the task_id cookie to be set from the server.
+    async function waitForTaskIdCookie() {
+      while(true) {
+        const taskId = getCookie("task_id");
+        if(taskId) {
+          console.log("Found task_id cookie:", taskId);
+          return taskId;
+        }
+
+        // Wait for 300ms between each iteration so that we don't overwhelm
+        // the client.
+        console.log("Waiting for task_id cookie...");
+        await sleep(300);
+      }
+    }
+    // Get cookie value by name.
+    function getCookie(cookieName) {
+      const cookieString = document.cookie;
+      if(!cookieString) {
+        return null;
+      }
+      const cookies = cookieString.split("; ");
+      for(const cookie of cookies) {
+        if(cookie.startsWith(`${cookieName}=`)) {
+          return cookie.split("=")[1];
+        }
+      }
+      return null;
+    }
+    // Sleep for given milliseconds.
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    // Call the function when the page has finished loading.
+    window.onload = function() {
+      waitForResult();
+    };
+  </script>
+</html>
